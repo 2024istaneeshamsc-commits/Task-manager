@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task Manager</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 50px; }
+        .card { background: rgb(252, 247, 247); padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 350px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { width: 100%; padding: 10px; background: #b09af3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .task { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
+        .done { text-decoration: line-through; color: gray; }
+    </style>
+</head>
+<body>
+
+    <div id="loginSection" class="card">
+        <h2>LOGIN</h2>
+        <input type="email" id="email" placeholder="Email (admin@test.com)">
+        <input type="password" id="password" placeholder="Password (1234)">
+        <button onclick="doLogin()">Login</button>
+    </div>
+
+    <div id="taskSection" class="card" style="display:none;">
+        <h2>Hello, <span id="userName"></span></h2>
+        <input type="text" id="newTask" placeholder="New task name...">
+        <button onclick="addTask()">Add Task</button>
+        <div id="list" style="margin-top:20px;"></div>
+    </div>
+
+<script>
+    let USER_ID = null;
+    const API = "http://localhost:3000";
+
+    async function doLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        const res = await fetch(`${API}/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if(data.success) {
+            USER_ID = data.user.user_id;
+            document.getElementById('userName').innerText = data.user.username;
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('taskSection').style.display = 'block';
+            refresh();
+        } else { alert(data.message); }
+    }
+
+    async function refresh() {
+        const res = await fetch(`${API}/tasks/${USER_ID}`);
+        const tasks = await res.json();
+        const listDiv = document.getElementById('list');
+        listDiv.innerHTML = '';
+        tasks.forEach(t => {
+            listDiv.innerHTML += `
+                <div class="task">
+                    <span class="${t.status==='completed'?'done':''}">${t.task_name}</span>
+                    <div>
+                        <button style="width:30px; background:green;" onclick="done(${t.task_id})">✓</button>
+                        <button style="width:30px; background:red;" onclick="del(${t.task_id})">X</button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    async function addTask() {
+        const name = document.getElementById('newTask').value;
+        await fetch(`${API}/add-task`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: USER_ID, task_name: name })
+        });
+        document.getElementById('newTask').value = '';
+        refresh(); // Refresh list immediately
+    }
+
+    async function done(id) { await fetch(`${API}/complete-task/${id}`, {method:'PUT'}); refresh(); }
+    async function del(id) { await fetch(`${API}/delete-task/${id}`, {method:'DELETE'}); refresh(); }
+</script>
+</body>
+</html>
